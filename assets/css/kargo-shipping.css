@@ -1,0 +1,27 @@
+/**
+ * Kargo National Shipping frontend CSS
+ */
+
+.kargo-notice {
+    padding: 10px 15px;
+    background-color: #f8f8f8;
+    border-left: 4px solid #ee0000;
+    margin-bottom: 15px;
+}
+
+.kargo-notice p {
+    margin: 0;
+    padding: 0;
+}
+
+#shipping_method li label img.kargo-logo {
+    max-height: 24px;
+    vertical-align: middle;
+    margin-left: 5px;
+}
+
+.kargo-estimated-delivery {
+    font-size: 0.85em;
+    color: #777;
+    margin-top: 5px;
+}
