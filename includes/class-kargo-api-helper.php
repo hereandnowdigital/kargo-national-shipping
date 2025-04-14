@@ -129,32 +129,72 @@
         /**
          * Process rate response from API
          *
-         * @param mixed $response API response
+         * @param $response_json
          *
          * @return array|bool Rate data on success, false on failure
          */
-        private function process_rate_response($response) {
-            if (is_string($response)) {
-                $xml = simplexml_load_string($response);
+        private function process_rate_response($response_json) {
+            $response_array = json_decode( json_encode($response_json), true );
+            $response = $response_array['any'];
+            if (!is_string($response)) {
+                $this->log_debug('Response is not a string.');
+                return false;
+            }
 
-                if ($xml === false) {
-                    $this->log_debug('Failed to parse XML response');
-                    return false;
+            $this->log_debug('Processing XML response...');
+
+            // Extract the KREW section as a raw string
+            $start = strpos($response, '<KREW ');
+            if ($start === false) {
+                $start = strpos($response, '<KREW>');
+            }
+
+            if ($start === false) {
+                $this->log_debug('No KREW element found in response');
+                return false;
+            }
+
+            $end = strpos($response, '</KREW>', $start);
+            if ($end === false) {
+                $this->log_debug('No closing KREW tag found');
+                return false;
+            }
+
+            // Extract the KREW content with its tags
+            $krew_length = $end - $start + 7; // +7 for '</KREW>'
+            $krew_xml = substr($response, $start, $krew_length);
+
+            $this->log_debug('Found KREW element: ' . $krew_xml);
+
+            // Extract the fields we need using simple string functions
+            $result = array();
+            $fields = array(
+                'CUST_ID', 'FREIGHT_CHARGE', 'FUEL_CHARGE', 'SUB_TOTAL',
+                'VAT_INC', 'VAT', 'MIN_RATE', 'RATE_PER_KG', 'MIN_KG',
+                'TOTAL_INSURANCE', 'IRREGULAR_FREIGHT_CHARGE'
+            );
+
+            foreach ($fields as $field) {
+                $field_start = strpos($krew_xml, '<' . $field . '>');
+                if ($field_start !== false) {
+                    $field_start += strlen($field) + 2; // +2 for '<>'
+                    $field_end = strpos($krew_xml, '</' . $field . '>', $field_start);
+                    if ($field_end !== false) {
+                        $value = substr($krew_xml, $field_start, $field_end - $field_start);
+                        $result[$field] = $value;
+                    }
                 }
+            }
 
-                $json = json_encode($xml);
-                $array = json_decode($json, true);
-
-                if (isset($array['diffgr:diffgram']['NewDataSet']['KREW'])) {
-                    return $array['diffgr:diffgram']['NewDataSet']['KREW'];
-                } elseif (isset($array['diffgram']['NewDataSet']['KREW'])) {
-                    return $array['diffgram']['NewDataSet']['KREW'];
-                }
+            if (!empty($result) && isset($result['VAT_INC'])) {
+                $this->log_debug('Successfully extracted rate data: ' . print_r($result, true));
+                return $result;
             }
 
             $this->log_debug('Could not extract rate data from response');
             return false;
         }
+
 
         /**
          * Test API connection
