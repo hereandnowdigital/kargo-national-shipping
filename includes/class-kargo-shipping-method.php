@@ -121,14 +121,22 @@
         }
 
         /**
-         * Calculate shipping cost based on API
+         * Calculate shipping cost based on API.
          */
         public function calculate_shipping($package = array()) {
-            // Check if all products have weight
+            // Check if all products have weight and dimensions
             $missing_weight_dimensions = $this->check_products_weight_dimensions($package);
 
             if (!empty($missing_weight_dimensions)) {
                 // Don't show this shipping method if products are missing weight/dimensions
+                // Optionally, log this issue for admin visibility
+                wc_get_logger()->warning(
+                    sprintf(
+                        'The following products are missing weight or dimensions: %s',
+                        implode(', ', $missing_weight_dimensions)
+                    ),
+                    array('source' => 'kargo-shipping')
+                );
                 return;
             }
 
@@ -196,19 +204,38 @@
         }
 
         /**
-         * Calculate total shipping weight
+         * Calculate total shipping weight, considering volumetric weight.
          */
         private function calculate_shipping_weight($package) {
-            $weight = 0;
+            $total_weight = 0;
+            $volumetric_divisor = 5000; // Standard divisor for volumetric weight (cm³ to kg)
 
             foreach ($package['contents'] as $item_id => $values) {
                 $product = $values['data'];
-                $item_weight = $product->get_weight();
+                $quantity = $values['quantity'];
 
-                $weight += (float) $item_weight * $values['quantity'];
+                // Get product dimensions
+                $length = $product->get_length();
+                $width = $product->get_width();
+                $height = $product->get_height();
+
+                // Calculate volumetric weight
+                $volumetric_weight = 0;
+                if ($length && $width && $height) {
+                    $volumetric_weight = ($length * $width * $height) / $volumetric_divisor;
+                }
+
+                // Get actual weight
+                $actual_weight = $product->get_weight();
+
+                // Use the greater of actual weight or volumetric weight
+                $effective_weight = max((float)$actual_weight, (float)$volumetric_weight);
+
+                // Multiply by quantity and add to total
+                $total_weight += $effective_weight * $quantity;
             }
 
-            return $weight;
+            return $total_weight;
         }
 
         /**
