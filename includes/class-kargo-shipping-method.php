@@ -107,17 +107,23 @@
          * Check if shipping method is available
          */
         public function is_available($package) {
+            if ( ! parent::is_available( $package ) )
+                return false;
+
+            // Only allow shipping to South Africa (ZA)
+            if ( isset( $package['destination']['country'] ) && $package['destination']['country'] !== 'ZA' )
+                return false;
+
             // Get API credentials
             $username = get_option('kargo_ns_username');
             $password = get_option('kargo_ns_password');
             $account_number = get_option('kargo_ns_account_number');
 
             // If credentials are not set, the method is not available
-            if (empty($username) || empty($password) || empty($account_number)) {
+            if (empty($username) || empty($password) || empty($account_number))
                 return false;
-            }
-
-            return parent::is_available($package);
+            
+            return true;
         }
 
         /**
