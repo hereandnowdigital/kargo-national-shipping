@@ -19,7 +19,11 @@
          *
          * @var Kargo_NS_API_Helper
          */
-        private $api_helper;
+        private Kargo_NS_API_Helper $api_helper;
+
+        private int $max_length = 120; //cm
+        private int $max_width  = 120; //cm
+        private int $max_height = 100; //cm
 
         /**
          * Constructor for shipping method class
@@ -114,6 +118,9 @@
             if ( isset( $package['destination']['country'] ) && $package['destination']['country'] !== 'ZA' )
                 return false;
 
+            if ( $this->exceeds_max_dimensions( $package ) )
+                return false;
+
             // Get API credentials
             $username = get_option('kargo_ns_username');
             $password = get_option('kargo_ns_password');
@@ -125,6 +132,45 @@
 
             return true;
         }
+
+        private function exceeds_max_dimensions( $package ): bool {
+            $unit = get_option( 'woocommerce_dimension_unit', 'cm' );
+
+            // Conversion multipliers to cm
+            $conversion_factors = [
+                'mm' => 0.1,
+                'cm' => 1,
+                'm'  => 100,
+                'in' => 2.54,
+                'yd' => 91.44,
+            ];
+
+            $max_length = $this->max_length;
+            $max_width  = $this->max_width;
+            $max_height = $this->max_height;
+
+            $factor = $conversion_factors[$unit] ?? 1;
+
+            foreach ( $package['contents'] as $item ) {
+                $product = $item['data'];
+
+                if ( ! $product instanceof WC_Product )
+                    continue;
+
+                // Convert dimensions to cm
+                $length = (float) $product->get_length() * $factor;
+                $width  = (float) $product->get_width()  * $factor;
+                $height = (float) $product->get_height() * $factor;
+
+                if ( $length > $max_length || $width > $max_width || $height > $max_height )
+                    return true;
+
+            }
+
+            return false;
+
+        }
+
 
         /**
          * Calculate shipping cost based on API.
