@@ -42,14 +42,14 @@
          *
          * @var string
          */
-        private $account_number;
+        private string $account_number;
 
         /**
          * Debug mode
          *
          * @var bool
          */
-        private $debug;
+        private bool $debug;
 
         /**
          * Constructor
@@ -57,9 +57,9 @@
          * @param string $username       API username
          * @param string $password       API password
          * @param string $account_number API account number
-         * @param bool   $debug          Debug mode
+         * @param bool $debug          Debug mode
          */
-        public function __construct($username = '', $password = '', $account_number = '', $debug = false) {
+        public function __construct($username = '', $password = '', $account_number = '', bool $debug = false) {
             $this->username = !empty($username) ? $username : get_option('kargo_ns_username');
             $this->password = !empty($password) ? $password : get_option('kargo_ns_password');
             $this->account_number = !empty($account_number) ? $account_number : get_option('kargo_ns_account_number');
@@ -69,13 +69,14 @@
         /**
          * Get rate from Kargo API
          *
-         * @param int $origin_postcode      Origin postal code
-         * @param int $destination_postcode Destination postal code
+         * @param string $origin_postcode      Origin postal code
+         * @param string $destination_postcode Destination postal code
          * @param float $weight             Shipment weight in kg
          *
          * @return array|bool Rate data on success, false on failure
          */
-        public function get_rate($origin_postcode, $destination_postcode, $weight) {
+        public function get_rate( string $origin_postcode, string $destination_postcode, float $weight): bool|array
+        {
             // Check required parameters
             if (empty($this->username) || empty($this->password) || empty($this->account_number)) {
                 $this->log_debug('Missing API credentials');
@@ -108,12 +109,12 @@
                 $this->log_debug('API Request: ' . print_r($params, true));
 
                 // Make API call
-                $response = $client->RateEnquiry($params);
+                $response = $client->RateEnquiry( $params );
 
                 $this->log_debug('API Response: ' . print_r($response, true));
 
                 // Check for valid response
-                if (isset($response->RateEnquiryResult) && !empty($response->RateEnquiryResult)) {
+                if (!empty($response->RateEnquiryResult)) {
                     return $this->process_rate_response($response->RateEnquiryResult);
                 }
 
@@ -133,7 +134,8 @@
          *
          * @return array|bool Rate data on success, false on failure
          */
-        private function process_rate_response($response_json) {
+        private function process_rate_response($response_json): bool|array
+        {
             $response_array = json_decode( json_encode($response_json), true );
             $response = $response_array['any'];
             if (!is_string($response)) {
@@ -201,7 +203,8 @@
          *
          * @return array Result of API test
          */
-        public function test_connection() {
+        public function test_connection(): array
+        {
             if (empty($this->username) || empty($this->password) || empty($this->account_number)) {
                 return array(
                     'success' => false,
@@ -263,7 +266,8 @@
          *
          * @param string $message Message to log
          */
-        private function log_debug($message) {
+        private function log_debug(string $message): void
+        {
             if ($this->debug) {
                 if (!defined('WC_LOG_HANDLER')) {
                     define('WC_LOG_HANDLER', 'WC_Log_Handler_File');
