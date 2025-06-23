@@ -59,7 +59,7 @@
          * @param string $account_number API account number
          * @param bool $debug          Debug mode
          */
-        public function __construct($username = '', $password = '', $account_number = '', bool $debug = false) {
+        public function __construct(string $username = '', string $password = '', string $account_number = '', bool $debug = false) {
             $this->username = !empty($username) ? $username : get_option('kargo_ns_username');
             $this->password = !empty($password) ? $password : get_option('kargo_ns_password');
             $this->account_number = !empty($account_number) ? $account_number : get_option('kargo_ns_account_number');
@@ -103,7 +103,7 @@
                     'accountNumber' => $this->account_number,
                     'postalCodeOrigin' => (int) $origin_postcode,
                     'postalCodeDestination' => (int) $destination_postcode,
-                    'weight' => (float) $weight
+                    'weight' => max( 1, (float) $weight ),
                 );
 
                 $this->log_debug('API Request: ' . print_r($params, true));

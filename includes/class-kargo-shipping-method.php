@@ -122,7 +122,7 @@
             // If credentials are not set, the method is not available
             if (empty($username) || empty($password) || empty($account_number))
                 return false;
-            
+
             return true;
         }
 
@@ -165,8 +165,8 @@
                 return;
             }
 
-            // Calculate total weight
-            $weight = $this->calculate_shipping_weight($package);
+            // Calculate total weight - Enforce a minimum weight of 1kg
+            $weight = $weight = max( 1, WC()->cart->get_cart_contents_weight() );
 
             // Call API to get shipping cost
             $shipping_cost = $this->get_shipping_cost_from_api($origin_postcode, $destination_postcode, $weight);
