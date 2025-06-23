@@ -25,16 +25,6 @@
         private int $max_width  = 120; //cm
         private int $max_height = 100; //cm
 
-	    private array $shipping_package = [
-		    'items' => [],
-		    'total_weight' => 1,
-		    'total_dimensions' => [
-			    'length' => 0,
-			    'width'  => 0,
-			    'height' => 0,
-		    ]
-	    ];
-
         /**
          * Constructor for shipping method class
          */
@@ -207,7 +197,7 @@
 
             // Calculate total weight - Enforce a minimum weight of 1kg
             $weight = $weight = max( 1, WC()->cart->get_cart_contents_weight() );
-	        $dimensions = $this->calculate_bounding_box_dimensions() ?? [0, 0, 0];
+	        $dimensions = $this->calculate_bounding_box_dimensions($package) ?? [0, 0, 0];
 
             // Call API to get shipping cost
             $shipping_cost = $this->get_shipping_cost_from_api($origin_postcode, $destination_postcode, $weight, $dimensions );
@@ -248,56 +238,69 @@
 	     *
 	     * @return array Associative array with 'length', 'width', and 'height' in cm.
 	     */
-	    public function calculate_bounding_box_dimensions() {
-		    $cart = WC()->cart;
-		    $items = $cart->get_cart();
-
+	    public function calculate_bounding_box_dimensions( $package ) {
+		    $length = 0;
+		    $width  = 0;
+		    $height = 0;
 		    $total_volume = 0;
-		    $max_length = 0;
-		    $max_width = 0;
-		    $max_height = 0;
 
-		    foreach ( $items as $item ) {
+
+		    foreach ( $package['contents'] as $item ) {
 			    $product = $item['data'];
-			    $quantity = $item['quantity'];
+			    if ( ! $product instanceof WC_Product )
+				    continue;
 
-			    $length = $product->get_length();
-			    $width  = $product->get_width();
-			    $height = $product->get_height();
+			    $quantity = $item['quantity'];
+			    $p_length = $product->get_length();
+			    $p_width  = $product->get_width();
+			    $p_height = $product->get_height();
 
 			    // Ensure dimensions are numeric
-			    $length = is_numeric( $length ) ? $length : 0;
-			    $width  = is_numeric( $width ) ? $width : 0;
-			    $height = is_numeric( $height ) ? $height : 0;
+			    $p_length = is_numeric( $p_length ) ? $p_length : 0;
+			    $p_width  = is_numeric( $p_width ) ? $p_width : 0;
+			    $p_height = is_numeric( $p_height ) ? $p_height : 0;
 
-			    $volume = $length * $width * $height * $quantity;
+			    $volume = $p_length * $p_width * $p_height * $quantity;
 			    $total_volume += $volume;
 
-			    $max_length = max( $max_length, $length );
-			    $max_width  = max( $max_width, $width );
-			    $max_height = max( $max_height, $height );
+			    // Add height cumulatively
+			    $height += $p_height * $quantity;
+
+			    // Take the max of length and width
+			    $length = max( $length, $p_length );
+			    $width  = max( $width, $p_width );
 		    }
 
 		    // Prevent division by zero
-		    $base_area = max( 1, $max_length * $max_width );
+		    $base_area = max( 1, $length * $width );
 
 		    // Calculate height based on total volume and base area
 		    $calculated_height = $total_volume / $base_area;
 
 		    // Ensure height is at least as tall as the tallest item
-		    $height = max( $calculated_height, $max_height );
+		    $height = max( $calculated_height, $height );
 
 		    // Apply inefficiency factor (e.g., 10% extra space)
 		    $inefficiency_factor = 1.1;
 		    $height *= $inefficiency_factor;
 
-		    $this->shipping_package['dimensions']['length'] = ceil( $max_length );
-		    $this->shipping_package['dimensions']['width'] = ceil( $max_width );
-		    $this->shipping_package['dimensions']['height'] = ceil( $height );
+		    $unit = get_option( 'woocommerce_dimension_unit', 'cm' );
+		    $conversion_factors = [
+			    'mm' => 0.1,
+			    'cm' => 1,
+			    'm'  => 100,
+			    'in' => 2.54,
+			    'yd' => 91.44,
+		    ];
 
-		    return array(
-			    $this->shipping_package['dimensions']
-		    );
+		    $factor = $conversion_factors[ $unit ] ?? 1;
+
+		    return [
+				'length' => ceil( $length * $factor ) ?? 0,
+				'width' => ceil( $width * $factor ) ?? 0,
+		        'height' => ceil( $height * $factor ) ?? 0
+		    ];
+
 	    }
 
 
