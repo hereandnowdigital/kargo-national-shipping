@@ -75,18 +75,21 @@
          *
          * @return array|bool Rate data on success, false on failure
          */
-        public function get_rate( string $origin_postcode, string $destination_postcode, float $weight): bool|array
-        {
+        public function parse_response( string $origin_postcode, string $destination_postcode, float $weight, array $dimensions): bool|array {
             // Check required parameters
             if (empty($this->username) || empty($this->password) || empty($this->account_number)) {
                 $this->log_debug('Missing API credentials');
                 return false;
             }
 
-            if (empty($origin_postcode) || empty($destination_postcode) || empty($weight)) {
-                $this->log_debug('Missing required parameters');
-                return false;
-            }
+	        if (
+		        empty($origin_postcode)
+		        || empty($destination_postcode)
+		        || (empty($weight) && empty($dimensions))
+	        ) {
+		        $this->log_debug('Missing required package parameters');
+		        return false;
+	        }
 
             try {
                 // Create SOAP client
@@ -96,27 +99,31 @@
                     'cache_wsdl' => WSDL_CACHE_NONE
                 ));
 
-                // Prepare request parameters
-                $params = array(
-                    'username' => $this->username,
-                    'password' => $this->password,
-                    'accountNumber' => $this->account_number,
-                    'postalCodeOrigin' => (int) $origin_postcode,
-                    'postalCodeDestination' => (int) $destination_postcode,
-                    'weight' => max( 1, (float) $weight ),
-                );
+	            // Prepare request parameters
+	            $params = array(
+		            'username' => $this->username,
+		            'password' => $this->password,
+		            'accountNumber' => $this->account_number,
+		            'postalCodeOrigin' => $origin_postcode,
+		            'postalCodeDestination' => $destination_postcode,
+		            'weight' => (int) round($weight ?? 1),  //ensure weight is always a minimum of 1
+		            'width' => (int) round($dimensions['width'] ?? 0),
+		            'height' => (int) round($dimensions['height'] ?? 0),
+		            'length' => (int) round($dimensions['length'] ?? 0),
+	            );
 
-                $this->log_debug('API Request: ' . print_r($params, true));
+	            // Make API call
+	            $response = $client->RateEnquiry($params);
+	            if ( isset( $params['password'] ) ) {
+		            $params['password'] = '[redacted]';
+	            }
+	            $this->log_debug('API Request: ' . print_r($params, true));
+	            $this->log_debug('API Response: ' . print_r($response, true));
 
-                // Make API call
-                $response = $client->RateEnquiry( $params );
-
-                $this->log_debug('API Response: ' . print_r($response, true));
-
-                // Check for valid response
-                if (!empty($response->RateEnquiryResult)) {
-                    return $this->process_rate_response($response->RateEnquiryResult);
-                }
+	            // Check for valid response
+	            if ( isset($response->RateEnquiryResult ) && !empty($response->RateEnquiryResult) ) {
+		            return $this->process_rate_response($response->RateEnquiryResult);
+	            }
 
                 $this->log_debug('Invalid API response');
                 return false;
@@ -134,68 +141,67 @@
          *
          * @return array|bool Rate data on success, false on failure
          */
-        private function process_rate_response($response_json): bool|array
-        {
-            $response_array = json_decode( json_encode($response_json), true );
-            $response = $response_array['any'];
-            if (!is_string($response)) {
-                $this->log_debug('Response is not a string.');
-                return false;
-            }
+	    private function process_rate_response($response_json) {
+		    $response_array = json_decode( json_encode($response_json), true );
+		    $response = $response_array['any'];
+		    if (!is_string($response)) {
+			    $this->log_debug('Response is not a string.');
+			    return false;
+		    }
 
-            $this->log_debug('Processing XML response...');
+		    // Extract the KREW section as a raw string
+		    $start = strpos($response, '<KREW ');
+		    if ($start === false) {
+			    $start = strpos($response, '<KREW>');
+		    }
 
-            // Extract the KREW section as a raw string
-            $start = strpos($response, '<KREW ');
-            if ($start === false) {
-                $start = strpos($response, '<KREW>');
-            }
+		    if ($start === false) {
+			    $this->log_debug('No KREW element found in response');
+			    return false;
+		    }
 
-            if ($start === false) {
-                $this->log_debug('No KREW element found in response');
-                return false;
-            }
+		    $end = strpos($response, '</KREW>', $start);
+		    if ($end === false) {
+			    $this->log_debug('No closing KREW tag found');
+			    return false;
+		    }
 
-            $end = strpos($response, '</KREW>', $start);
-            if ($end === false) {
-                $this->log_debug('No closing KREW tag found');
-                return false;
-            }
+		    // Extract the KREW content with its tags
+		    $krew_length = $end - $start + 7; // +7 for '</KREW>'
+		    $krew_xml = substr($response, $start, $krew_length);
 
-            // Extract the KREW content with its tags
-            $krew_length = $end - $start + 7; // +7 for '</KREW>'
-            $krew_xml = substr($response, $start, $krew_length);
+		    // Extract the fields we need using simple string functions
+		    $result = array();
+		    $fields = array(
+			    'RequestStatusSuccess',
+			    'RequestErrorMessage',
+			    'Subtotal',
+			    'VAT',
+			    'Total',
+			    'AccountActive',
+			    'AccountStatus'
+		    );
 
-            $this->log_debug('Found KREW element: ' . $krew_xml);
+		    foreach ($fields as $field) {
+			    $field_start = strpos($krew_xml, '<' . $field . '>');
+			    if ($field_start !== false) {
+				    $field_start += strlen($field) + 2; // +2 for '<>'
+				    $field_end = strpos($krew_xml, '</' . $field . '>', $field_start);
+				    if ($field_end !== false) {
+					    $value = substr($krew_xml, $field_start, $field_end - $field_start);
+					    $result[$field] = $value;
+				    }
+			    }
+		    }
 
-            // Extract the fields we need using simple string functions
-            $result = array();
-            $fields = array(
-                'CUST_ID', 'FREIGHT_CHARGE', 'FUEL_CHARGE', 'SUB_TOTAL',
-                'VAT_INC', 'VAT', 'MIN_RATE', 'RATE_PER_KG', 'MIN_KG',
-                'TOTAL_INSURANCE', 'IRREGULAR_FREIGHT_CHARGE'
-            );
+		    if (!empty($result) && isset($result['Subtotal'])) {
+			    $this->log_debug('Successfully extracted response data: ' . print_r($result, true));
+			    return $result;
+		    }
 
-            foreach ($fields as $field) {
-                $field_start = strpos($krew_xml, '<' . $field . '>');
-                if ($field_start !== false) {
-                    $field_start += strlen($field) + 2; // +2 for '<>'
-                    $field_end = strpos($krew_xml, '</' . $field . '>', $field_start);
-                    if ($field_end !== false) {
-                        $value = substr($krew_xml, $field_start, $field_end - $field_start);
-                        $result[$field] = $value;
-                    }
-                }
-            }
-
-            if (!empty($result) && isset($result['VAT_INC'])) {
-                $this->log_debug('Successfully extracted rate data: ' . print_r($result, true));
-                return $result;
-            }
-
-            $this->log_debug('Could not extract rate data from response');
-            return false;
-        }
+		    $this->log_debug('Could not extract rate data from response');
+		    return false;
+	    }
 
 
         /**
@@ -224,34 +230,13 @@
                 $response = $client->RateEnquiry(array(
                     'username' => $this->username,
                     'password' => $this->password,
-                    'accountNumber' => $this->account_number,
-                    'postalCodeOrigin' => 2000, // Example postal code
-                    'postalCodeDestination' => 8000, // Example postal code
-                    'weight' => 1.0 // Example weight
+                    'accountNumber' => $this->account_number
                 ));
 
-                if (isset($response->RateEnquiryResult) && !empty($response->RateEnquiryResult)) {
-                    // Try to parse the result
-                    $result = $this->process_rate_response($response->RateEnquiryResult);
-
-                    if ($result) {
-                        return array(
-                            'success' => true,
-                            'message' => __('API connection successful! Your credentials are working correctly.', 'kargo-national-shipping'),
-                            'data' => $result
-                        );
-                    } else {
-                        return array(
-                            'success' => false,
-                            'message' => __('API connection failed. Could not parse the response.', 'kargo-national-shipping'),
-                        );
-                    }
-                } else {
-                    return array(
-                        'success' => false,
-                        'message' => __('API connection failed. The API returned an unexpected response.', 'kargo-national-shipping'),
-                    );
-                }
+	            return array(
+		            'success' => true,
+		            'message' => __('API connection successful! Your credentials are working correctly.', 'kargo-national-shipping'),
+	            );
 
             } catch (Exception $e) {
                 return array(
@@ -277,4 +262,49 @@
                 $logger->add('kargo-shipping', $message);
             }
         }
+
+	    /**
+	     * Encrypt password before saving
+	     *
+	     * @param string $password Password to encrypt
+	     *
+	     * @return string Encrypted password
+	     */
+	    public function encrypt_password($password) {
+		    if (empty($password)) {
+			    return '';
+		    }
+
+		    // If password already starts with 'kargo_encrypted:', don't encrypt again
+		    if (strpos($password, 'kargo_encrypted:') === 0) {
+			    return $password;
+		    }
+
+		    // Simple encryption - in a real world scenario, use more robust encryption
+		    return 'kargo_encrypted:' . base64_encode($password);
+	    }
+
+	    /**
+	     * Decrypt password
+	     *
+	     * @param string $encrypted_password Encrypted password
+	     *
+	     * @return string Decrypted password
+	     */
+	    public function decrypt_password($encrypted_password) {
+		    if (empty($encrypted_password)) {
+			    return '';
+		    }
+
+		    // Check if password is encrypted
+		    if (strpos($encrypted_password, 'kargo_encrypted:') === 0) {
+			    // Remove prefix and decrypt
+			    $encrypted_part = substr($encrypted_password, strlen('kargo_encrypted:'));
+			    return base64_decode($encrypted_part);
+		    }
+
+		    // Password is not encrypted
+		    return $encrypted_password;
+	    }
+
     }

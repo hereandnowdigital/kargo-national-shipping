@@ -25,6 +25,16 @@
         private int $max_width  = 120; //cm
         private int $max_height = 100; //cm
 
+	    private array $shipping_package = [
+		    'items' => [],
+		    'total_weight' => 1,
+		    'total_dimensions' => [
+			    'length' => 0,
+			    'width'  => 0,
+			    'height' => 0,
+		    ]
+	    ];
+
         /**
          * Constructor for shipping method class
          */
@@ -59,9 +69,7 @@
 
             // Define user set variables
             $this->title            = $this->get_option('title', $this->method_title);
-            $this->enabled          = $this->get_option('enabled', 'yes');
             $this->origin_postcode  = $this->get_option('origin_postcode', '');
-            $this->fallback_rate    = $this->get_option('fallback_rate', '0');
             $this->debug            = $this->get_option('debug', 'no');
         }
 
@@ -77,24 +85,11 @@
                     'default'     => __('Kargo National Shipping', 'kargo-national-shipping'),
                     'desc_tip'    => true,
                 ),
-                'enabled' => array(
-                    'title'   => __('Enable/Disable', 'kargo-national-shipping'),
-                    'type'    => 'checkbox',
-                    'label'   => __('Enable this shipping method', 'kargo-national-shipping'),
-                    'default' => 'yes',
-                ),
                 'origin_postcode' => array(
                     'title'       => __('Origin Postal Code', 'kargo-national-shipping'),
                     'type'        => 'text',
                     'description' => __('Enter the postal code from where you ship your products. If left empty, the store postal code will be used.', 'kargo-national-shipping'),
                     'default'     => '',
-                    'desc_tip'    => true,
-                ),
-                'fallback_rate' => array(
-                    'title'       => __('Fallback Rate', 'kargo-national-shipping'),
-                    'type'        => 'price',
-                    'description' => __('If the Kargo API is unavailable, this fallback rate will be used. Set to 0 to disable the shipping method when API is unavailable.', 'kargo-national-shipping'),
-                    'default'     => '0',
                     'desc_tip'    => true,
                 ),
                 'debug' => array(
@@ -111,6 +106,8 @@
          * Check if shipping method is available
          */
         public function is_available($package) {
+	        $available = $this->is_enabled();
+
             if ( ! parent::is_available( $package ) )
                 return false;
 
@@ -196,37 +193,28 @@
             $destination_postcode = $package['destination']['postcode'];
 
             // If no destination postcode, we cannot calculate shipping
-            if (empty($destination_postcode)) {
+            if (empty($destination_postcode))
                 return;
-            }
 
             // Get origin postcode from settings or store settings
-            $origin_postcode = $this->origin_postcode;
-            if (empty($origin_postcode)) {
+            $origin_postcode = $this->origin_postcode ?? '';
+            if (empty($origin_postcode))
                 $origin_postcode = get_option('woocommerce_store_postcode');
-            }
 
             // If no origin postcode, we cannot calculate shipping
-            if (empty($origin_postcode)) {
+            if (empty($origin_postcode))
                 return;
-            }
 
             // Calculate total weight - Enforce a minimum weight of 1kg
             $weight = $weight = max( 1, WC()->cart->get_cart_contents_weight() );
+	        $dimensions = $this->calculate_bounding_box_dimensions() ?? [0, 0, 0];
 
             // Call API to get shipping cost
-            $shipping_cost = $this->get_shipping_cost_from_api($origin_postcode, $destination_postcode, $weight);
+            $shipping_cost = $this->get_shipping_cost_from_api($origin_postcode, $destination_postcode, $weight, $dimensions );
 
-            // If we couldn't get a valid shipping cost
-            if (false === $shipping_cost) {
-                // Use fallback rate if set
-                if (!empty($this->fallback_rate) && $this->fallback_rate > 0) {
-                    $shipping_cost = $this->fallback_rate;
-                } else {
-                    // Otherwise, don't offer the shipping method
-                    return;
-                }
-            }
+	        // If we couldn't get a valid shipping cost - don't offer the shipping method
+	        if (false === $shipping_cost)
+		        return;
 
             // Register the rate
             $rate = array(
@@ -242,7 +230,7 @@
         /**
          * Check if all products have weight and dimensions
          */
-        private function check_products_weight_dimensions($package) {
+        private function check_products_weight_dimensions($package): array {
             $missing_items = array();
 
             foreach ($package['contents'] as $item_id => $values) {
@@ -255,51 +243,81 @@
             return $missing_items;
         }
 
-        /**
-         * Calculate total shipping weight, considering volumetric weight.
-         */
-        private function calculate_shipping_weight($package) {
-            $total_weight = 0;
-            $volumetric_divisor = 5000; // Standard divisor for volumetric weight (cm³ to kg)
+	    /**
+	     * Calculate bounding box dimensions for WooCommerce cart items.
+	     *
+	     * @return array Associative array with 'length', 'width', and 'height' in cm.
+	     */
+	    public function calculate_bounding_box_dimensions() {
+		    $cart = WC()->cart;
+		    $items = $cart->get_cart();
 
-            foreach ($package['contents'] as $item_id => $values) {
-                $product = $values['data'];
-                $quantity = $values['quantity'];
+		    $total_volume = 0;
+		    $max_length = 0;
+		    $max_width = 0;
+		    $max_height = 0;
 
-                // Get product dimensions
-                $length = $product->get_length();
-                $width = $product->get_width();
-                $height = $product->get_height();
+		    foreach ( $items as $item ) {
+			    $product = $item['data'];
+			    $quantity = $item['quantity'];
 
-                // Calculate volumetric weight
-                $volumetric_weight = 0;
-                if ($length && $width && $height) {
-                    $volumetric_weight = ($length * $width * $height) / $volumetric_divisor;
-                }
+			    $length = $product->get_length();
+			    $width  = $product->get_width();
+			    $height = $product->get_height();
 
-                // Get actual weight
-                $actual_weight = $product->get_weight();
+			    // Ensure dimensions are numeric
+			    $length = is_numeric( $length ) ? $length : 0;
+			    $width  = is_numeric( $width ) ? $width : 0;
+			    $height = is_numeric( $height ) ? $height : 0;
 
-                // Use the greater of actual weight or volumetric weight
-                $effective_weight = max((float)$actual_weight, (float)$volumetric_weight);
+			    $volume = $length * $width * $height * $quantity;
+			    $total_volume += $volume;
 
-                // Multiply by quantity and add to total
-                $total_weight += $effective_weight * $quantity;
-            }
+			    $max_length = max( $max_length, $length );
+			    $max_width  = max( $max_width, $width );
+			    $max_height = max( $max_height, $height );
+		    }
 
-            return $total_weight;
-        }
+		    // Prevent division by zero
+		    $base_area = max( 1, $max_length * $max_width );
+
+		    // Calculate height based on total volume and base area
+		    $calculated_height = $total_volume / $base_area;
+
+		    // Ensure height is at least as tall as the tallest item
+		    $height = max( $calculated_height, $max_height );
+
+		    // Apply inefficiency factor (e.g., 10% extra space)
+		    $inefficiency_factor = 1.1;
+		    $height *= $inefficiency_factor;
+
+		    $this->shipping_package['dimensions']['length'] = ceil( $max_length );
+		    $this->shipping_package['dimensions']['width'] = ceil( $max_width );
+		    $this->shipping_package['dimensions']['height'] = ceil( $height );
+
+		    return array(
+			    $this->shipping_package['dimensions']
+		    );
+	    }
+
 
         /**
          * Get shipping cost from Kargo API
          */
-        private function get_shipping_cost_from_api($origin_postcode, $destination_postcode, $weight) {
+        private function get_shipping_cost_from_api($origin_postcode, $destination_postcode, $weight, $dimensions = []) {
             // Get rate from API
-            $rate = $this->api_helper->get_rate($origin_postcode, $destination_postcode, $weight);
+	        $api_response = $this->api_helper->parse_response( $origin_postcode, $destination_postcode, $weight, $dimensions );
 
-            if ($rate && isset($rate['VAT_INC'])) {
-                return $rate['VAT_INC'];
-            }
+	        if (
+		        is_array( $api_response )
+		        && ! empty( $api_response['AccountActive'] )
+		        && $api_response['AccountActive'] === 'true'
+		        && isset( $api_response['Subtotal'] )
+		        && is_numeric( $api_response['Subtotal'] )
+		        && $api_response['Subtotal'] > 0
+	        )
+
+				return $api_response['Subtotal'];
 
             return false;
         }
