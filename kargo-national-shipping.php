@@ -2,24 +2,25 @@
     /**
      * Plugin Name: Kargo National Shipping
      * Plugin URI:
-     * Description: A custom shipping method for WooCommerce that integrates with Kargo National shipping services.
+     * Description: Shipping method for WooCommerce that integrates with Kargo National shipping services.
      * Version: 0.1.0
      * Author: Dezel
      * Author URI:
      * Text Domain: kargo-national-shipping
      * Domain Path: /languages
      * WC requires at least: 3.0.0
-     * WC tested up to: 8.0.0
+     * WC tested up to: 9.5.0
+     * WC HPOS compatible: true
      * Contributor: Elizabeth Meyer <elizabeth@hereandnowdigital.co.za>
      * @package Kargo_National_Shipping
      */
 
-// Exit if accessed directly
+    // Exit if accessed directly
     if (!defined('ABSPATH'))
         exit;
 
 
-// Define plugin constants
+    // Define plugin constants
     define('KARGO_NS_VERSION', '0.1.0');
     define('KARGO_NS_PLUGIN_DIR', plugin_dir_path(__FILE__));
     define('KARGO_NS_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -33,6 +34,18 @@
             return in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_option('active_plugins')));
         }
     }
+
+    add_action( 'before_woocommerce_init', 'kargo_national_shipping_declare_hpos_compatibility' );
+    function kargo_national_shipping_declare_hpos_compatibility() {
+        if ( class_exists( \Automattic\WooCommerce\Utilities\FeaturesUtil::class ) ) {
+            \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility(
+                'custom_order_tables',
+                __FILE__,
+                true
+            );
+        }
+    }
+
 
     /**
      * Initialize the plugin
