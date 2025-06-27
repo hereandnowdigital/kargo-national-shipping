@@ -71,15 +71,15 @@
                 'title' => array(
                     'title'       => __('Method Title', 'kargo-national-shipping'),
                     'type'        => 'text',
-                    'description' => __('This controls the title which the user sees during checkout.', 'kargo-national-shipping'),
+                    'description' => __('The title the user sees during checkout.', 'kargo-national-shipping'),
                     'default'     => __('Kargo National Shipping', 'kargo-national-shipping'),
                     'desc_tip'    => true,
                 ),
                 'origin_postcode' => array(
                     'title'       => __('Origin Postal Code', 'kargo-national-shipping'),
                     'type'        => 'text',
-                    'description' => __('Enter the postal code from where you ship your products. If left empty, the store postal code will be used.', 'kargo-national-shipping'),
-                    'default'     => '',
+                    'description' => __('Enter the postal code from where you ship your products.  Defaults to store base location postal code.', 'kargo-national-shipping'),
+                    'default'     => wc_format_postcode( WC()->countries->get_base_postcode(), WC()->countries->get_base_country() ),
                     'desc_tip'    => true,
                 ),
                 'debug' => array(
