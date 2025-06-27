@@ -25,19 +25,17 @@
          * Constructor
          */
         public function __construct() {
-            // Hooks and filters
             add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
             add_action('woocommerce_before_cart', array($this, 'check_cart_items_weight_dimensions'));
             add_action('woocommerce_before_checkout_form', array($this, 'check_cart_items_weight_dimensions'));
 
-            // Initialize
             $this->init();
         }
 
         /**
          * Get instance - singleton pattern
          */
-        public static function get_instance() {
+        public static function get_instance(): ?Kargo_National_Shipping {
             if (self::$instance == null) {
                 self::$instance = new self();
             }
@@ -45,12 +43,24 @@
             return self::$instance;
         }
 
-        /**
-         * Initialize the plugin
-         */
-        public function init() {
-            // Any initialization code
+	    public function init() {
+			$this->register_actions();
+		    $this->register_filters();
+	    }
+
+	    /**
+	     * Register actions for the plugin
+	     */
+		public function register_actions() {
+
         }
+
+	    /**
+	     * Register filters for the plugin
+	     */
+	    public function register_filters() {
+
+	    }
 
         /**
          * Enqueue scripts and styles
