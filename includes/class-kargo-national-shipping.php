@@ -19,16 +19,12 @@
          *
          * @var Kargo_National_Shipping
          */
-        private static $instance = null;
+        private static ?Kargo_National_Shipping $instance = null;
 
         /**
          * Constructor
          */
         public function __construct() {
-            add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
-            add_action('woocommerce_before_cart', array($this, 'check_cart_items_weight_dimensions'));
-            add_action('woocommerce_before_checkout_form', array($this, 'check_cart_items_weight_dimensions'));
-
             $this->init();
         }
 
@@ -49,14 +45,16 @@
 	    }
 
 	    /**
-	     * Register actions for the plugin
+	     * Register actions
 	     */
 		public function register_actions() {
-
+			add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
+			add_action('woocommerce_before_cart', array($this, 'check_cart_items_weight_dimensions'));
+			add_action('woocommerce_before_checkout_form', array($this, 'check_cart_items_weight_dimensions'));
         }
 
 	    /**
-	     * Register filters for the plugin
+	     * Register filters
 	     */
 	    public function register_filters() {
 

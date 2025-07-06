@@ -70,14 +70,6 @@
                 'kargo_ns_settings'
             );
 
-	        add_settings_field(
-		        'kargo_ns_account_number',
-		        __('Account Number', 'kargo-national-shipping'),
-		        array($this, 'account_number_field'),
-		        'kargo_ns_settings',
-		        'kargo_ns_api_settings'
-	        );
-
             // Add fields
             add_settings_field(
                 'kargo_ns_username',
@@ -95,7 +87,13 @@
                 'kargo_ns_api_settings'
             );
 
-
+            add_settings_field(
+                'kargo_ns_account_number',
+                __('Account Number', 'kargo-national-shipping'),
+                array($this, 'account_number_field'),
+                'kargo_ns_settings',
+                'kargo_ns_api_settings'
+            );
         }
 
         /**

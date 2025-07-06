@@ -36,7 +36,6 @@
             $this->supports           = array(
                 'shipping-zones',
                 'instance-settings',
-                'instance-settings-modal',
             );
 
             $this->init();
@@ -63,11 +62,95 @@
             $this->debug            = $this->get_option('debug', 'no');
         }
 
+	    /**
+	     * Register shipping methods actions
+	     */
+		public function register_actions() {
+		}
+
+	    /**
+	     * Register shipping methods filters
+	     */
+	    public function register_filters() {
+		    add_filter( 'woocommerce_get_sections_shipping', [$this, 'kargo_add_shipping_section'] );
+		    add_filter( 'woocommerce_get_settings_shipping', [$this, 'kargo_get_shipping_settings'], 10, 2 );
+
+	    }
+
+		public function kargo_get_shipping_settings( $settings, $current_section ) {
+		    if ( $current_section !== 'kargo_national' )
+			    return $settings;
+
+		    return [
+			    [
+				    'title' => 'Account Number',
+				    'type'  => 'text',
+				    'id'    => 'kargo_national_account_number',
+			    ],
+			    [
+				    'title' => 'Username',
+				    'type'  => 'text',
+				    'id'    => 'kargo_national_username',
+			    ],
+			    [
+				    'title' => 'Password',
+				    'type'  => 'password',
+				    'id'    => 'kargo_national_password',
+			    ],
+			    [
+				    'title' => 'Kargo National Settings',
+				    'type'  => 'title',
+				    'id'    => 'kargo_national_title',
+			    ],
+			    [
+				    'title'    => 'Username',
+				    'id'       => 'kargo_national_username',
+				    'type'     => 'text',
+				    'desc'     => 'Your Kargo API username',
+				    'default'  => '',
+			    ],
+			    [
+				    'title'    => 'Password',
+				    'id'       => 'kargo_national_password',
+				    'type'     => 'password',
+				    'desc'     => 'Your Kargo API password',
+				    'default'  => '',
+			    ],
+			    [
+				    'type' => 'sectionend',
+				    'id'   => 'kargo_national_title',
+			    ],
+		    ];
+	    }
+
+	    public function kargo_add_shipping_section( $sections ) {
+		    $sections['kargo_national'] = 'Kargo National Shipping';
+		    return $sections;
+	    }
+
+
         /**
          * Initialize form fields
          */
         public function init_form_fields() {
             $this->instance_form_fields = array(
+	            'enabled' => array(
+		            'title' => 'Enable/Disable',
+		            'label' => 'Enable to turn on this shipping method.',
+		            'default' => 'yes',
+		            'type' => 'checkbox'),
+	            'api_username' => array(
+		            'title' => 'Username',
+		            'description' => 'Kargo National API username',
+		            'default' => '',
+		            'type' => 'text'
+	            ),
+	            'api_password' => array(
+		            'title' => 'Password',
+		            'description' => 'Kargo National API password',
+		            'default' => '',
+		            'type' => 'text'
+	            ),
                 'title' => array(
                     'title'       => __('Method Title', 'kargo-national-shipping'),
                     'type'        => 'text',
