@@ -98,12 +98,40 @@
         public function is_available($package) {
 	        $available = $this->is_enabled();
 
+	        if ( ! parent::is_available( $package ) )
+		        wc_get_logger()->warning(
+			        sprintf(
+				        'Unavailable: %s',
+				        implode(', ', ['Parent not available'])
+			        ),
+			        array('source' => 'kargo-shipping')
+		        );
+
             if ( ! parent::is_available( $package ) )
                 return false;
+
+	        if ( isset( $package['destination']['country'] ) && $package['destination']['country'] !== 'ZA' )
+			        wc_get_logger()->warning(
+				        sprintf(
+					        'Unavailable: %s',
+					        implode(', ', ['Destination not ZA'])
+				        ),
+				        array('source' => 'kargo-shipping')
+			        );
 
             // Only allow shipping to South Africa (ZA)
             if ( isset( $package['destination']['country'] ) && $package['destination']['country'] !== 'ZA' )
                 return false;
+
+
+	        if ( $this->exceeds_max_dimensions( $package ) )
+			        wc_get_logger()->warning(
+				        sprintf(
+					        'Unavailable: %s',
+					        implode(', ', ['Exceeds max dimenions'])
+				        ),
+				        array('source' => 'kargo-shipping')
+			        );
 
             if ( $this->exceeds_max_dimensions( $package ) )
                 return false;
@@ -112,6 +140,16 @@
             $username = get_option('kargo_ns_username');
             $password = get_option('kargo_ns_password');
             $account_number = get_option('kargo_ns_account_number');
+
+	        if (empty($username) || empty($password) || empty($account_number))
+		        if ( $this->exceeds_max_dimensions( $package ) )
+			        wc_get_logger()->warning(
+				        sprintf(
+					        'Unavailable: %s',
+					        implode(', ', ['Empty API details'])
+				        ),
+				        array('source' => 'kargo-shipping')
+			        );
 
             // If credentials are not set, the method is not available
             if (empty($username) || empty($password) || empty($account_number))

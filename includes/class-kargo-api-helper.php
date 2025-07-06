@@ -61,7 +61,7 @@
          */
         public function __construct(string $username = '', string $password = '', string $account_number = '', bool $debug = false) {
             $this->username = !empty($username) ? $username : get_option('kargo_ns_username');
-            $this->password = !empty($password) ? $password : get_option('kargo_ns_password');
+            $this->password = !empty($password) ? $password : $this->decrypt_password(get_option('kargo_ns_password'));
             $this->account_number = !empty($account_number) ? $account_number : get_option('kargo_ns_account_number');
             $this->debug = $debug;
         }
@@ -226,12 +226,32 @@
                     'cache_wsdl' => WSDL_CACHE_NONE
                 ));
 
-                // Test with sample data
-                $response = $client->RateEnquiry(array(
-                    'username' => $this->username,
-                    'password' => $this->password,
-                    'accountNumber' => $this->account_number
-                ));
+				$requestParams = array(
+					'username' => $this->username,
+					'password' => $this->password,
+					'accountNumber' => $this->account_number,
+					'postalCodeOrigin' => '2001',
+					'postalCodeDestination' => '2001',
+					'weight' => 10,
+					'width' => 10,
+					'height' => 10,
+					'length' => 10
+				);
+
+                $response = $client->RateEnquiry($requestParams);
+	            $response_detailsArr = $this->process_rate_response($response->RateEnquiryResult);
+
+				if ( $response_detailsArr['RequestStatusSuccess'] == 'false') {
+					$message = sprintf(__('API connection failed: %s', 'kargo-national-shipping'), $response_detailsArr['RequestErrorMessage'] ?? 'Something went wrong');
+					$this->log_debug('API Test Failed: ' . $message);
+					return array(
+						'success' => false,
+						'message' => $message
+					);
+				}
+
+	            $message = __('API connection successful! Your credentials are working correctly.', 'kargo-national-shipping');
+	            $this->log_debug($message);
 
 	            return array(
 		            'success' => true,
