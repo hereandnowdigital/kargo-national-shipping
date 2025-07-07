@@ -96,6 +96,15 @@
             );
         }
 
+	    /**
+	     * Account number field
+	     */
+	    public function account_number_field() {
+		    $account_number = get_option('kargo_ns_account_number');
+		    echo '<input type="text" name="kargo_ns_account_number" value="' . esc_attr($account_number) . '" class="regular-text" />';
+		    echo '<p class="description">' . __('Your Kargo Account Number', 'kargo-national-shipping') . '</p>';
+	    }
+
         /**
          * API settings section
          */
@@ -121,14 +130,7 @@
             echo '<p class="description">' . __('Your My Kargo Online Password', 'kargo-national-shipping') . '</p>';
         }
 
-        /**
-         * Account number field
-         */
-        public function account_number_field() {
-            $account_number = get_option('kargo_ns_account_number');
-            echo '<input type="text" name="kargo_ns_account_number" value="' . esc_attr($account_number) . '" class="regular-text" />';
-            echo '<p class="description">' . __('Your Kargo Account Number', 'kargo-national-shipping') . '</p>';
-        }
+
 
         /**
          * Encrypt password before saving

@@ -3,7 +3,7 @@
      * Plugin Name: Kargo National Shipping
      * Plugin URI:
      * Description: Shipping method for WooCommerce that integrates with Kargo National shipping services.
-     * Version: 0.1.0
+     * Version: 0.0.1
      * Author: Dezel
      * Author URI:
      * Text Domain: kargo-national-shipping
@@ -21,7 +21,7 @@
 
 
     // Define plugin constants
-    define('KARGO_NS_VERSION', '0.1.0');
+    define('KARGO_NS_VERSION', '0.0.1');
     define('KARGO_NS_PLUGIN_DIR', plugin_dir_path(__FILE__));
     define('KARGO_NS_PLUGIN_URL', plugin_dir_url(__FILE__));
     define('KARGO_NS_PLUGIN_BASENAME', plugin_basename(__FILE__));
@@ -30,13 +30,13 @@
      * Check if WooCommerce is active
      */
     if (!function_exists('kargo_ns_is_woocommerce_active')) {
-        function kargo_ns_is_woocommerce_active() {
+        function kargo_ns_is_woocommerce_active(): bool {
             return in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_option('active_plugins')));
         }
     }
 
-    add_action( 'before_woocommerce_init', 'kargo_national_shipping_declare_hpos_compatibility' );
-    function kargo_national_shipping_declare_hpos_compatibility() {
+    add_action( 'before_woocommerce_init', 'kns_declare_hpos_compatibility' );
+    function kns_declare_hpos_compatibility(): void {
         if ( class_exists( \Automattic\WooCommerce\Utilities\FeaturesUtil::class ) ) {
             \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility(
                 'custom_order_tables',
@@ -50,7 +50,7 @@
     /**
      * Initialize the plugin
      */
-    function kargo_ns_init() {
+    function kargo_ns_init(): void {
         // Load plugin textdomain
         load_plugin_textdomain('kargo-national-shipping', false, dirname(plugin_basename(__FILE__)) . '/languages');
 
@@ -76,7 +76,7 @@
     /**
      * Initialize the shipping method class
      */
-    function kargo_ns_shipping_init() {
+    function kargo_ns_shipping_init(): void {
         // Only load if WooCommerce is active
         if (!kargo_ns_is_woocommerce_active()) {
             return;
@@ -94,7 +94,7 @@
     /**
      * Activation hook
      */
-    function kargo_ns_activate() {
+    function kargo_ns_activate(): void {
         // Check if WooCommerce is active
         if (!kargo_ns_is_woocommerce_active()) {
             deactivate_plugins(plugin_basename(__FILE__));
@@ -111,7 +111,7 @@
     /**
      * Deactivation hook
      */
-    function kargo_ns_deactivate() {
+    function kargo_ns_deactivate(): void {
         // Clean up if needed
         flush_rewrite_rules();
     }
