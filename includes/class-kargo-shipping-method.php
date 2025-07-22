@@ -59,7 +59,8 @@
             // Define user set variables
             $this->title            = $this->get_option('title', $this->method_title);
             $this->origin_postcode  = $this->get_option('origin_postcode', '');
-            $this->debug            = $this->get_option('debug', 'no');
+	        $this->debug            = 1;
+            //$this->debug            = $this->get_option('debug', 'no');
         }
 
 	    /**
@@ -381,8 +382,8 @@
 			    $p_width  = is_numeric( $p_width ) ? $p_width : 0;
 			    $p_height = is_numeric( $p_height ) ? $p_height : 0;
 
-			    $volume = $p_length * $p_width * $p_height * $quantity;
-			    $total_volume += $volume;
+			    $p_volume = $p_length * $p_width * $p_height * $quantity;
+			    $total_volume += $p_volume;
 
 			    // Add height cumulatively
 			    $height += $p_height * $quantity;
@@ -401,8 +402,9 @@
 		    // Ensure height is at least as tall as the tallest item
 		    $height = max( $calculated_height, $height );
 
-		    // Apply inefficiency factor (e.g., 10% extra space)
-		    $inefficiency_factor = 1.1;
+		    // Apply inefficiency factor (1.1 for 10% extra space)
+		    // 20250722 - on request of teh client don't apply inefficiency factor
+		    $inefficiency_factor = 1;
 		    $height *= $inefficiency_factor;
 
 		    $unit = get_option( 'woocommerce_dimension_unit', 'cm' );
